@@ -2,19 +2,21 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Mon Site Web</title>
+    <title>{{ title }} - Mon Site Web</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
 
     <div class="container">
+        <h1> {{ title }}</h1>
         {% block content %}
         {% endblock %}
     </div>
 
     <footer>
-        <a href="/">Accueil</a> |
-        <a href="/a-propos">À propos</a>
+        <a href="/" class="{{ 'active' if active_page == 'home' }}">Accueil</a>
+        |
+        <a href="/a-propos" class="{{ 'active' if active_page == 'about' }}">À propos</a>
     </footer>
 
 </body>
