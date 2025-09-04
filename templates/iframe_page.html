@@ -1,0 +1,10 @@
+{% extends "layout.html" %}
+
+{% block content %}
+    <p>
+        Si l'interface de {{ service_name }} ne s'affiche pas ci-dessous, 
+        <a href="{{ iframe_url }}" target="_blank">cliquez ici pour l'ouvrir dans un nouvel onglet</a>.
+    </p>
+    
+    <iframe src="{{ iframe_url }}" width="100%" height="800px" style="border:none;"></iframe>
+{% endblock %}

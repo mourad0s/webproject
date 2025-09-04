@@ -1,0 +1,74 @@
+{% extends "layout.html" %}
+
+{% block extra_head %}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+{% endblock %}
+
+{% block content %}
+    <div id="connection-form">
+        <h3>Choisir un serveur</h3>
+        <select id="server-select">
+            <option value="">-- Sélectionnez un serveur --</option>
+            {% for server in servers %}
+                <option value="{{ server.id }}">{{ server.name }}</option>
+            {% endfor %}
+        </select>
+        <button id="connect-btn">Se connecter</button>
+        <button id="reconnect-btn" style="display: none;"><i class="fas fa-sync-alt"></i> Reconnecter</button>
+    </div>
+
+    <div id="connection-status" style="color: red; margin-top: 10px;"></div>
+
+    <div id="terminal" style="margin-top: 20px;"></div>
+
+    <script src="https://cdn.socket.io/4.5.2/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
+    <script>
+        const term = new Terminal({ convertEol: true, cursorBlink: true });
+        const fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(document.getElementById('terminal'));
+        fitAddon.fit();
+
+        const socket = io.connect('/terminal');
+        const connectionForm = document.getElementById('connection-form');
+        const connectBtn = document.getElementById('connect-btn');
+        const reconnectBtn = document.getElementById('reconnect-btn');
+        const serverSelect = document.getElementById('server-select');
+        const connectionStatus = document.getElementById('connection-status');
+
+        // Fonction pour démarrer la connexion SSH
+        function startConnection() {
+            const server_id = serverSelect.value;
+            if (server_id) {
+                connectionStatus.textContent = ''; // Efface les messages précédents
+                term.clear(); // Efface le terminal
+                socket.emit('start_ssh', { server_id: server_id });
+                connectionForm.style.display = 'none';
+                reconnectBtn.style.display = 'inline-block'; // Affiche le bouton de reconnexion
+            } else {
+                connectionStatus.textContent = "Veuillez sélectionner un serveur.";
+            }
+        }
+
+        connectBtn.addEventListener('click', startConnection);
+        reconnectBtn.addEventListener('click', startConnection); // Le bouton de reconnexion appelle la même fonction
+
+        socket.on('ssh_output', (data) => {
+            term.write(data);
+            // Si le message contient "Erreur de connexion", on réaffiche le formulaire
+            if (data.includes("Erreur de connexion")) {
+                connectionStatus.textContent = data; // Affiche l'erreur
+                connectionForm.style.display = 'flex'; // Réaffiche le formulaire pour choisir un autre serveur
+                reconnectBtn.style.display = 'none'; // Cache le bouton de reconnexion
+                term.clear(); // Efface le terminal pour l'erreur
+            }
+        });
+
+        term.onData((data) => {
+            socket.emit('ssh_input', { command: data });
+        });
+    </script>
+{% endblock %}
