@@ -14,7 +14,11 @@
             {% endfor %}
         </select>
         <button id="connect-btn">Se connecter</button>
-        <button id="reconnect-btn" style="display: none;"><i class="fas fa-sync-alt"></i> Reconnecter</button>
+    </div>
+
+    <div id="action-buttons" style="display: none;">
+        <button id="reconnect-btn"><i class="fas fa-sync-alt"></i> Reconnecter</button>
+        <button id="disconnect-btn"><i class="fas fa-times-circle"></i> Déconnecter</button>
     </div>
 
     <div id="connection-status" style="color: red; margin-top: 10px;"></div>
@@ -38,6 +42,8 @@
         const reconnectBtn = document.getElementById('reconnect-btn');
         const serverSelect = document.getElementById('server-select');
         const connectionStatus = document.getElementById('connection-status');
+        const disconnectBtn = document.getElementById('disconnect-btn'); // On récupère le nouveau bouton
+
 
         // Fonction pour démarrer la connexion SSH
         function startConnection() {
@@ -47,14 +53,24 @@
                 term.clear(); // Efface le terminal
                 socket.emit('start_ssh', { server_id: server_id });
                 connectionForm.style.display = 'none';
-                reconnectBtn.style.display = 'inline-block'; // Affiche le bouton de reconnexion
+                actionButtons.style.display = 'flex';
             } else {
                 connectionStatus.textContent = "Veuillez sélectionner un serveur.";
             }
         }
 
+        function disconnect() {
+            socket.emit('ssh_disconnect');
+            term.clear();
+            connectionForm.style.display = 'flex';
+            actionButtons.style.display = 'none';
+            connectionStatus.textContent = 'Déconnecté';
+        }
+
         connectBtn.addEventListener('click', startConnection);
-        reconnectBtn.addEventListener('click', startConnection); // Le bouton de reconnexion appelle la même fonction
+        reconnectBtn.addEventListener('click', startConnection);
+        disconnectBtn.addEventListener('click', disconnect);
+
 
         socket.on('ssh_output', (data) => {
             term.write(data);

@@ -35,5 +35,3 @@ SERVERS = [
         "password": "pass"
     }
 ]
-
-PROMETHEUS_URL = "http://10.0.2.13:9090"

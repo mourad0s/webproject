@@ -11,6 +11,8 @@ socketio = SocketIO(app)
 # Dictionnaire pour garder en mémoire la connexion SSH de chaque visiteur
 ssh_sessions = {}
 
+background_task_started = False
+
 # --- ROUTES HTTP CLASSIQUES ---
 @app.route('/')
 def home():
@@ -19,7 +21,7 @@ def home():
 @app.route('/grafana')
 def grafana_page():
     return render_template('iframe_page.html', active_page='grafana', title='Grafana',
-                           iframe_url="http://127.0.0.1:9100", service_name='Grafana')
+                           iframe_url="http://localhost:3000/d/rYdddlPWk/node-exporter-full?orgId=1&from=now-24h&to=now&timezone=browser&var-DS_PROMETHEUS=aex1uf2yfydj4c&var-job=serveurs_linux&var-nodename=dhcp&var-node=srv-dhcp.servers:9100&var-diskdevices=%5Ba-z%5D%2B%7Cnvme%5B0-9%5D%2Bn%5B0-9%5D%2B%7Cmmcblk%5B0-9%5D%2B&refresh=1m", service_name='Grafana')
 
 @app.route('/stork')
 def stork_page():
@@ -33,24 +35,51 @@ def terminal_page():
 
 # --- GESTION DES ÉVÉNEMENTS WEBSOCKET POUR LE TERMINAL ---
 
+@socketio.on('connect', namespace='/terminal')
+def terminal_connect():
+    # ON LANCE LA TÂCHE DE FOND ICI
+    global background_task_started
+    if not background_task_started:
+        socketio.start_background_task(target=read_ssh_output)
+        background_task_started = True
+    print(f"Client connecté : {request.sid}")
+
+
 @socketio.on('start_ssh', namespace='/terminal')
 def start_ssh(data):
-    """Reçoit la demande de connexion SSH du formulaire."""
-    sid = request.sid  # ID unique de la session du navigateur
+    """Reçoit l'ID du serveur choisi et utilise config.py pour se connecter."""
+    sid = request.sid
     try:
+        # 1. On récupère l'ID envoyé par le navigateur
+        server_id = data['server_id']
+
+        # 2. On cherche le dictionnaire correspondant à cet ID dans notre liste SERVERS
+        server_config = next((s for s in app.config['SERVERS'] if s['id'] == server_id), None)
+
+        if not server_config:
+            raise Exception("Serveur non trouvé dans la configuration.")
+
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        client.connect(hostname=data['host'], username=data['user'], password=data['pass'], timeout=10)
 
-        channel = client.invoke_shell()
+        # 3. On utilise les informations du dictionnaire trouvé pour se connecter
+        client.connect(
+            hostname=server_config['host'],
+            port=server_config.get('port', 22),
+            username=server_config['user'],
+            password=server_config['password']
+        )
+
+        channel = client.invoke_shell(term='xterm')
         ssh_sessions[sid] = (client, channel)
 
-        socketio.emit('ssh_output', 'Connexion réussie !\r\n', namespace='/terminal', to=sid)
-        print(f"Connexion SSH établie pour {sid}")
+        socketio.emit('ssh_output', f"Connexion à {server_config['name']} réussie !\r\n", namespace='/terminal', to=sid)
+        print(f"Connexion SSH à {server_config['name']} établie pour {sid}")
 
     except Exception as e:
-        socketio.emit('ssh_output', f'Erreur de connexion : {e}\r\n', namespace='/terminal', to=sid)
-        print(f"Erreur SSH pour {sid}: {e}")
+        error_message = f"Erreur de connexion : {type(e).__name__} - {e}\r\n"
+        socketio.emit('ssh_output', error_message, namespace='/terminal', to=sid)
+        print(f"Erreur SSH DÉTAILLÉE pour {sid}: {type(e).__name__} - {e}")
 
 @socketio.on('ssh_input', namespace='/terminal')
 def ssh_input(data):
@@ -72,6 +101,7 @@ def terminal_disconnect():
 # --- TÂCHE DE FOND ---
 def read_ssh_output():
     """Tourne en permanence pour lire la sortie du terminal SSH et l'envoyer au navigateur."""
+    print(">>> TÂCHE DE FOND DÉMARRÉE <<<")
     while True:
         for sid, (_client, channel) in list(ssh_sessions.items()):
             try:
@@ -85,6 +115,4 @@ def read_ssh_output():
 
 # --- LANCEMENT DE L'APPLICATION ---
 if __name__ == '__main__':
-    socketio.start_background_task(target=read_ssh_output)
-    # On utilise socketio.run() au lieu de app.run() pour activer les WebSockets
     socketio.run(app, debug=True)
