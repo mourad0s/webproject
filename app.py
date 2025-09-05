@@ -26,7 +26,7 @@ def grafana_page():
 @app.route('/stork')
 def stork_page():
     return render_template('iframe_page.html', active_page='stork', title='Stork',
-                           iframe_url="http://remplacer-par-url-stork", service_name='Stork')
+                           iframe_url="http://stork.servers:8080", service_name='Stork')
 
 @app.route('/terminal')
 def terminal_page():
