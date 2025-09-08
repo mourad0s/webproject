@@ -10,7 +10,7 @@
         <select id="server-select">
             <option value="">-- Sélectionnez un serveur --</option>
             {% for server in servers %}
-                <option value="{{ server.id }}">{{ server.name }}</option>
+                <option value="{{ server.server_id }}">{{ server.name }}</option>
             {% endfor %}
         </select>
         <button id="connect-btn">Se connecter</button>

@@ -1,12 +1,20 @@
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO
+from models import db, Server, NavigationLink
 import paramiko
-import config
+
 
 
 app = Flask(__name__)
-app.config.from_object(config)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
+db.init_app(app)
+
 socketio = SocketIO(app)
+
+@app.context_processor
+def inject_navigation_links():
+    links = NavigationLink.query.order_by(NavigationLink.order).all()
+    return dict(navigation_links=links)
 
 # Dictionnaire pour garder en mémoire la connexion SSH de chaque visiteur
 ssh_sessions = {}
@@ -19,19 +27,61 @@ def home():
     return render_template('index.html', active_page='home', title='Tableau de Bord')
 
 @app.route('/grafana')
-def grafana_page():
+def grafana():
     return render_template('iframe_page.html', active_page='grafana', title='Grafana',
                            iframe_url="http://localhost:3000/d/rYdddlPWk/node-exporter-full?orgId=1&from=now-24h&to=now&timezone=browser&var-DS_PROMETHEUS=aex1uf2yfydj4c&var-job=serveurs_linux&var-nodename=dhcp&var-node=srv-dhcp.servers:9100&var-diskdevices=%5Ba-z%5D%2B%7Cnvme%5B0-9%5D%2Bn%5B0-9%5D%2B%7Cmmcblk%5B0-9%5D%2B&refresh=1m", service_name='Grafana')
 
 @app.route('/stork')
-def stork_page():
+def stork():
     return render_template('iframe_page.html', active_page='stork', title='Stork',
                            iframe_url="http://stork.servers:8080", service_name='Stork')
 
 @app.route('/terminal')
-def terminal_page():
-    servers = app.config["SERVERS"]
+def terminal():
+    servers = Server.query.all()
     return render_template('terminal.html', active_page='terminal', title='Terminal SSH', servers=servers)
+
+@app.route('/admin')
+def admin():
+    all_servers = Server.query.order_by(Server.name).all()
+    all_links = NavigationLink.query.order_by(NavigationLink.order).all()
+    return render_template('admin.html',
+                           active_page='admin',
+                           title='Administration',
+                           servers=all_servers,
+                           links=all_links)
+
+
+
+@app.route('/admin/add_link', methods=['POST'])
+def add_link():
+    new_link = NavigationLink(
+        name=request.form.get('name'),
+        url_endpoint=request.form.get('url_endpoint'),
+        icon_class=request.form.get('icon_class'),
+        order=int(request.form.get('order')),
+        description=request.form.get('description')
+    )
+    db.session.add(new_link)
+    db.session.commit()
+    flash(f"Le lien '{new_link.name}' a été ajouté.")
+    return redirect(url_for('admin'))
+
+
+@app.route('/admin/add_server', methods=['POST'])
+def add_server():
+    new_server = Server(
+        server_id=request.form.get('server_id'),
+        name=request.form.get('name'),
+        host=request.form.get('host'),
+        user=request.form.get('user'),
+        password=request.form.get('password')
+    )
+    db.session.add(new_server)
+    db.session.commit()
+    flash(f"Le serveur '{new_server.name}' a été ajouté.")
+    return redirect(url_for('admin'))
+
 
 # --- GESTION DES ÉVÉNEMENTS WEBSOCKET POUR LE TERMINAL ---
 
@@ -47,34 +97,33 @@ def terminal_connect():
 
 @socketio.on('start_ssh', namespace='/terminal')
 def start_ssh(data):
-    """Reçoit l'ID du serveur choisi et utilise config.py pour se connecter."""
+    """Reçoit l'ID du serveur, le cherche dans la BDD et se connecte."""
     sid = request.sid
     try:
-        # 1. On récupère l'ID envoyé par le navigateur
         server_id = data['server_id']
 
-        # 2. On cherche le dictionnaire correspondant à cet ID dans notre liste SERVERS
-        server_config = next((s for s in app.config['SERVERS'] if s['id'] == server_id), None)
+        # ÉTAPE 1 : On cherche le serveur DANS LA BASE DE DONNÉES
+        server = Server.query.filter_by(server_id=server_id).first()
 
-        if not server_config:
-            raise Exception("Serveur non trouvé dans la configuration.")
+        if not server:
+            raise Exception("Serveur non trouvé dans la base de données.")
 
         client = paramiko.SSHClient()
         client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
-        # 3. On utilise les informations du dictionnaire trouvé pour se connecter
+        # ÉTAPE 2 : On utilise les infos de l'objet "server" trouvé dans la BDD
         client.connect(
-            hostname=server_config['host'],
-            port=server_config.get('port', 22),
-            username=server_config['user'],
-            password=server_config['password']
+            hostname=server.host,
+            port=server.port,
+            username=server.user,
+            password=server.password
         )
 
         channel = client.invoke_shell(term='xterm')
         ssh_sessions[sid] = (client, channel)
 
-        socketio.emit('ssh_output', f"Connexion à {server_config['name']} réussie !\r\n", namespace='/terminal', to=sid)
-        print(f"Connexion SSH à {server_config['name']} établie pour {sid}")
+        socketio.emit('ssh_output', f"Connexion à {server.name} réussie !\r\n", namespace='/terminal', to=sid)
+        print(f"Connexion SSH à {server.name} établie pour {sid}")
 
     except Exception as e:
         error_message = f"Erreur de connexion : {type(e).__name__} - {e}\r\n"

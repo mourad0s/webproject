@@ -1,0 +1,129 @@
+{% extends "layout.html" %}
+
+{# --- Le contenu HTML visible va dans le bloc "content" --- #}
+{% block content %}
+    <div class="admin-actions">
+        <button id="open-add-link-modal" class="btn-add">Ajouter un lien de navigation</button>
+        <button id="open-add-server-modal" class="btn-add">Ajouter un serveur</button>
+    </div>
+
+    <hr style="margin-top: 20px; margin-bottom: 20px;">
+
+    <h2>Gestion des Serveurs</h2>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Hôte (IP)</th>
+                <th>Utilisateur</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for server in servers %}
+            <tr>
+                <td>{{ server.name }}</td>
+                <td>{{ server.host }}</td>
+                <td>{{ server.user }}</td>
+                <td>
+                    <a href="#">Modifier</a> | <a href="#">Supprimer</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h2 style="margin-top: 40px;">Gestion de la Navigation</h2>
+    <table class="admin-table">
+        <thead>
+            <tr>
+                <th>Nom</th>
+                <th>Endpoint</th>
+                <th>Icône</th>
+                <th>Ordre</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for link in links %}
+            <tr>
+                <td>{{ link.name }}</td>
+                <td>{{ link.url_endpoint }}</td>
+                <td><i class="{{ link.icon_class }}"></i></td>
+                <td>{{ link.order }}</td>
+                <td>
+                    <a href="#">Modifier</a> | <a href="#">Supprimer</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div id="add-link-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close" data-modal-id="add-link-modal">&times;</span>
+            <h2>Ajouter un lien de navigation</h2>
+            <form method="post" action="{{ url_for('add_link') }}" class="admin-form">
+                <input type="text" name="name" placeholder="Nom (ex: Mon Service)" required>
+                <input type="text" name="url_endpoint" placeholder="Endpoint (ex: mon_service)" required>
+                <input type="text" name="icon_class" placeholder="Classe de l'icône (ex: fas fa-rocket)" required>
+                <input type="number" name="order" placeholder="Ordre" required>
+                <textarea name="description" placeholder="Description pour la carte"></textarea>
+                <button type="submit">Ajouter le lien</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="add-server-modal" class="modal-overlay">
+        <div class="modal-content">
+            <span class="modal-close" data-modal-id="add-server-modal">&times;</span>
+            <h2>Ajouter un serveur</h2>
+            <form method="post" action="{{ url_for('add_server') }}" class="admin-form">
+                <input type="text" name="server_id" placeholder="ID unique (ex: srv-new)" required>
+                <input type="text" name="name" placeholder="Nom complet (ex: Nouveau Serveur Web)" required>
+                <input type="text" name="host" placeholder="Adresse IP" required>
+                <input type="text" name="user" placeholder="Nom d'utilisateur" required>
+                <input type="password" name="password" placeholder="Mot de passe" required>
+                <button type="submit">Ajouter le serveur</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}
+
+
+{# --- Tout le JavaScript va dans le bloc "scripts" --- #}
+{% block scripts %}
+<script>
+    // On récupère les éléments
+    const addLinkBtn = document.getElementById('open-add-link-modal');
+    const addServerBtn = document.getElementById('open-add-server-modal');
+    const addLinkModal = document.getElementById('add-link-modal');
+    const addServerModal = document.getElementById('add-server-modal');
+    const closeButtons = document.querySelectorAll('.modal-close');
+
+    // On ouvre la modale "Ajouter un lien" quand on clique sur le bouton
+    addLinkBtn.onclick = function() {
+        addLinkModal.style.display = "block";
+    }
+
+    // On ouvre la modale "Ajouter un serveur"
+    addServerBtn.onclick = function() {
+        addServerModal.style.display = "block";
+    }
+
+    // On ferme la modale quand on clique sur la croix (X)
+    closeButtons.forEach(button => {
+        button.onclick = function() {
+            const modalId = this.getAttribute('data-modal-id');
+            document.getElementById(modalId).style.display = "none";
+        }
+    });
+
+    // On ferme aussi la modale si on clique sur le fond gris
+    window.onclick = function(event) {
+        if (event.target == addLinkModal || event.target == addServerModal) {
+            event.target.style.display = "none";
+        }
+    }
+</script>
+{% endblock %}

@@ -11,23 +11,11 @@
 
     <header class="main-header">
         <nav class="main-nav">
-            <a href="{{ url_for('home') }}" class="nav-item {{ 'active' if active_page == 'home' }}">
-                <i class="fas fa-home"></i> Accueil
-            </a>
-            <a href="{{ url_for('grafana_page') }}" class="nav-item {{ 'active' if active_page == 'grafana_page' }}">
-                <i class="fas fa-chart-line"></i> Grafana
-            </a>
-            <a href="{{ url_for('stork_page') }}" class="nav-item {{ 'active' if active_page == 'stork_page' }}">
-                <i class="fas fa-server"></i> Stork
-            </a>
-            <a href="{{ url_for('terminal_page') }}" class="nav-item {{ 'active' if active_page == 'terminal_page' }}">
-                <i class="fas fa-terminal"></i> Terminal SSH
-            </a>
-            {% if session.logged_in %}
-                <a href="{{ url_for('logout') }}" class="nav-item logout-btn">
-                    <i class="fas fa-sign-out-alt"></i> Déconnexion
+            {% for link in navigation_links %}
+                <a href="{{ url_for(link.url_endpoint) }}" class="nav-item {{ 'active' if active_page == link.url_endpoint }}">
+                    <i class="{{ link.icon_class }}"></i> {{ link.name }}
                 </a>
-            {% endif %}
+            {% endfor %}
         </nav>
     </header>
 
@@ -36,6 +24,9 @@
         {% block content %}
         {% endblock %}
     </div>
+
+
+    {% block scripts %}{% endblock %}
 
 </body>
 </html>

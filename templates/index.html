@@ -1,22 +1,19 @@
+
+
 {% extends "layout.html" %}
 
 {% block content %}
     <div class="dashboard-grid">
-            <a href="{{ url_for('grafana_page') }}" class ="card">
-                <h2>Grafana</h2>
-                <p>Visualisez les métriques et dashboard de monitoring.</p>
-            </a>
 
-            <a href="{{ url_for('stork_page') }}" class="card">
-                <h2>Stork</h2>
-                <p>Gérer et superviser DNS et DHCP</p>
-            </a>
-
-            <a href="{{ url_for('terminal_page') }}" class="card">
-                <h2>Terminal SSH</h2>
-                <p>Accèder en ligne à l'interface de commande du serveur</p>
-            </a>
-
+        {% for link in navigation_links %}
+            {# On n'affiche pas de carte pour le lien "Accueil" #}
+            {% if link.url_endpoint != 'home' %}
+                <a href="{{ url_for(link.url_endpoint) }}" class="card">
+                    <h2><i class="{{ link.icon_class }}"></i> {{ link.name }}</h2>
+                    <p>{{ link.description }}</p>
+                </a>
+            {% endif %}
+        {% endfor %}
 
     </div>
 {% endblock %}
